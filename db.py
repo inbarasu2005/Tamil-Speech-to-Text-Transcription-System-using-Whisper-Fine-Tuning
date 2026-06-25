@@ -1,15 +1,20 @@
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# Database credentials as requested by the user
-DB_HOST = "localhost"
-DB_PORT = "5433"
-DB_USER = "postgres"
-DB_PASSWORD = "Inba@2005"
-DB_NAME = "TamiltoSpeech"
+# Database credentials (defaulting to local fallback values)
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5433")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "Inba@2005")
+DB_NAME = os.getenv("DB_NAME", "TamiltoSpeech")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def create_database_if_not_exists():
     """Connects to the default 'postgres' database and creates DB_NAME if it doesn't exist."""
+    if DATABASE_URL:
+        # Remote databases are pre-created, bypass this step
+        return
     conn = None
     try:
         conn = psycopg2.connect(
@@ -40,7 +45,9 @@ def create_database_if_not_exists():
 
 def get_db_connection():
     """Establishes a connection to the PostgreSQL database."""
-    conn = psycopg2.connect(
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return psycopg2.connect(
         host=DB_HOST,
         port=DB_PORT,
         user=DB_USER,
@@ -48,12 +55,12 @@ def get_db_connection():
         dbname=DB_NAME,
         cursor_factory=RealDictCursor
     )
-    return conn
 
 def init_db():
     """Initializes the database by creating it first, then creating the users table."""
-    # Step 1: Ensure database exists
-    create_database_if_not_exists()
+    # Step 1: Ensure database exists (if not using a connection string)
+    if not DATABASE_URL:
+        create_database_if_not_exists()
     
     # Step 2: Ensure users table exists
     conn = None
