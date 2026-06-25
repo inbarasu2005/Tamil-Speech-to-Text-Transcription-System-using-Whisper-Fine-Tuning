@@ -17,3 +17,4 @@ temp/
 debug_entry.txt
 error_log.txt
 transcription_result.txt
+local_app.db

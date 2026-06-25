@@ -1,5 +1,6 @@
 import os
 import psycopg2
+import sqlite3
 from psycopg2.extras import RealDictCursor
 
 # Function to load environment variables from .env file
@@ -13,73 +14,75 @@ def load_env():
                     parts = line.split("=", 1)
                     if len(parts) == 2:
                         key = parts[0].strip()
-                        val = parts[1].strip().strip('"').strip("'")
-                        os.environ[key] = val
+                        # Do not override existing environment variables (e.g. from Render)
+                        if key not in os.environ:
+                            val = parts[1].strip().strip('"').strip("'")
+                            os.environ[key] = val
 
 # Load .env
 load_env()
 
-# Database credentials (defaulting to local fallback values)
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5433")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "Inba@2005")
-DB_NAME = os.getenv("DB_NAME", "TamiltoSpeech")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-def create_database_if_not_exists():
-    """Connects to the default 'postgres' database and creates DB_NAME if it doesn't exist."""
-    if DATABASE_URL:
-        # Remote databases are pre-created, bypass this step
-        return
-    conn = None
-    try:
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            dbname="postgres"
-        )
-        conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-        cur = conn.cursor()
+class SQLiteCursorWrapper:
+    def __init__(self, cursor):
+        self.cursor = cursor
+
+    def execute(self, query, params=None):
+        # Convert SERIAL PRIMARY KEY to SQLite format
+        if "SERIAL PRIMARY KEY" in query:
+            query = query.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
         
-        # Check if the database exists
-        cur.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s;", (DB_NAME,))
-        exists = cur.fetchone()
-        if not exists:
-            print(f"Database '{DB_NAME}' does not exist. Creating it...")
-            cur.execute(f'CREATE DATABASE "{DB_NAME}";')
-            print(f"Database '{DB_NAME}' created successfully.")
+        # Convert %s placeholder to ? for SQLite compatibility
+        if params is not None:
+            query = query.replace("%s", "?")
+            return self.cursor.execute(query, params)
         else:
-            print(f"Database '{DB_NAME}' already exists.")
-        cur.close()
-    except Exception as e:
-        print(f"Error checking/creating database: {e}")
-    finally:
-        if conn:
-            conn.close()
+            return self.cursor.execute(query)
+
+    def fetchone(self):
+        row = self.cursor.fetchone()
+        if row is not None:
+            return dict(row)
+        return None
+
+    def fetchall(self):
+        rows = self.cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    def close(self):
+        self.cursor.close()
+
+class SQLiteConnectionWrapper:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def cursor(self):
+        return SQLiteCursorWrapper(self.conn.cursor())
+
+    def commit(self):
+        self.conn.commit()
+
+    def rollback(self):
+        self.conn.rollback()
+
+    def close(self):
+        self.conn.close()
 
 def get_db_connection():
-    """Establishes a connection to the PostgreSQL database."""
+    """Establishes a connection to PostgreSQL if DATABASE_URL is set, otherwise falls back to SQLite."""
     if DATABASE_URL:
+        # Use PostgreSQL database
         return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        dbname=DB_NAME,
-        cursor_factory=RealDictCursor
-    )
+    else:
+        # Fallback to local SQLite database file
+        db_path = os.path.join(os.path.dirname(__file__), "local_app.db")
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        return SQLiteConnectionWrapper(conn)
 
 def init_db():
-    """Initializes the database by creating it first, then creating the users table."""
-    # Step 1: Ensure database exists (if not using a connection string)
-    if not DATABASE_URL:
-        create_database_if_not_exists()
-    
-    # Step 2: Ensure users table exists
+    """Initializes the database by creating the users table."""
     conn = None
     try:
         conn = get_db_connection()
@@ -98,7 +101,10 @@ def init_db():
         cur.execute(create_table_query)
         conn.commit()
         cur.close()
-        print("Database initialized successfully: 'users' table is ready.")
+        if DATABASE_URL:
+            print("Database initialized successfully: PostgreSQL 'users' table is ready.")
+        else:
+            print("Database initialized successfully: SQLite fallback 'users' table is ready.")
         return True, "Success"
     except Exception as e:
         error_msg = f"Database Initialization Error: {str(e)}"
