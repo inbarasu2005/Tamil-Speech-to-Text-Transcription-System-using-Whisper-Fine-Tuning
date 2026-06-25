@@ -72,8 +72,8 @@ class SQLiteConnectionWrapper:
 def get_db_connection():
     """Establishes a connection to PostgreSQL if DATABASE_URL is set, otherwise falls back to SQLite."""
     if DATABASE_URL:
-        # Use PostgreSQL database
-        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        # Use PostgreSQL database with a 5-second timeout to prevent hanging the startup phase
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, connect_timeout=5)
     else:
         # Fallback to local SQLite database file
         db_path = os.path.join(os.path.dirname(__file__), "local_app.db")
