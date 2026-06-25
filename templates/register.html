@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Register - Tamil Speech-to-Text{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6 col-xl-5">
+        <div class="glass-card mt-3">
+            <div class="text-center mb-4">
+                <h2 class="fw-bold mb-1">Create an <span class="text-gradient">Account</span></h2>
+                <p class="text-white-50 small">Register to transcribe your Tamil speech to text</p>
+            </div>
+
+            <form action="{{ url_for('register') }}" method="POST" id="registerForm" class="needs-validation" novalidate>
+                <!-- Full Name Field -->
+                <div class="mb-3">
+                    <label for="fullname" class="form-label">Full Name</label>
+                    <div class="input-group-custom">
+                        <input type="text" class="form-control" id="fullname" name="fullname" placeholder="Enter your full name" required minlength="2" maxlength="100">
+                        <i class="bi bi-person-fill input-icon"></i>
+                    </div>
+                </div>
+
+                <!-- Email Field -->
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email Address</label>
+                    <div class="input-group-custom">
+                        <input type="email" class="form-control" id="email" name="email" placeholder="name@example.com" required maxlength="100">
+                        <i class="bi bi-envelope-fill input-icon"></i>
+                    </div>
+                </div>
+
+                <!-- Password Field -->
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <div class="input-group-custom">
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Create a strong password" required minlength="6">
+                        <i class="bi bi-lock-fill input-icon"></i>
+                        <button class="password-toggle-btn" type="button" onclick="togglePasswordVisibility('password', 'passwordToggleIcon')">
+                            <i class="bi bi-eye-slash" id="passwordToggleIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Confirm Password Field -->
+                <div class="mb-4">
+                    <label for="confirm_password" class="form-label">Confirm Password</label>
+                    <div class="input-group-custom">
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Repeat your password" required minlength="6">
+                        <i class="bi bi-lock-fill input-icon"></i>
+                        <button class="password-toggle-btn" type="button" onclick="togglePasswordVisibility('confirm_password', 'confirmPasswordToggleIcon')">
+                            <i class="bi bi-eye-slash" id="confirmPasswordToggleIcon"></i>
+                        </button>
+                    </div>
+                    <div id="passwordMismatchError" class="text-danger small mt-2 d-none">
+                        <i class="bi bi-exclamation-circle-fill me-1"></i>Passwords do not match!
+                    </div>
+                </div>
+
+                <!-- Register Button -->
+                <button type="submit" class="btn btn-primary-custom w-100 py-2.5 mb-3" id="registerBtn">
+                    <i class="bi bi-person-plus-fill"></i> Register Account
+                </button>
+
+                <div class="text-center">
+                    <span class="text-white-50 small">Already have an account? </span>
+                    <a href="{{ url_for('login') }}" class="text-gradient fw-semibold text-decoration-none small">Login here</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function togglePasswordVisibility(fieldId, iconId) {
+        const passwordField = document.getElementById(fieldId);
+        const toggleIcon = document.getElementById(iconId);
+        if (passwordField.type === "password") {
+            passwordField.type = "text";
+            toggleIcon.classList.remove("bi-eye-slash");
+            toggleIcon.classList.add("bi-eye");
+        } else {
+            passwordField.type = "password";
+            toggleIcon.classList.remove("bi-eye");
+            toggleIcon.classList.add("bi-eye-slash");
+        }
+    }
+
+    // Client-side Password Matching & Validation
+    const form = document.getElementById('registerForm');
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const mismatchError = document.getElementById('passwordMismatchError');
+
+    form.addEventListener('submit', function (event) {
+        let isValid = true;
+
+        if (password.value !== confirmPassword.value) {
+            mismatchError.classList.remove('d-none');
+            confirmPassword.classList.add('is-invalid');
+            isValid = false;
+        } else {
+            mismatchError.classList.add('d-none');
+            confirmPassword.classList.remove('is-invalid');
+        }
+
+        if (!form.checkValidity() || !isValid) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        form.classList.add('was-validated');
+    });
+
+    // Reset error class on password input changes
+    confirmPassword.addEventListener('input', function() {
+        if (password.value === confirmPassword.value) {
+            mismatchError.classList.add('d-none');
+            confirmPassword.classList.remove('is-invalid');
+        }
+    });
+</script>
+{% endblock %}

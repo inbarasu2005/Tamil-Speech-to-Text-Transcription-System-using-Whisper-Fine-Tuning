@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Tamil Speech-to-Text{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Dashboard Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-5">
+            <div>
+
+                <h4 class="text-white-50 mb-0">Upload audio or record your voice to convert Tamil speech to clean text.</h4>
+            </div>
+            
+        </div>
+
+        <!-- Hidden inputs to feed configuration variables to JavaScript securely -->
+        <input type="hidden" id="apiKeyInput" value="{{ default_api_key }}">
+        <input type="hidden" id="modelInput" value="gemini-2.5-flash">
+
+        <div class="row g-4">
+            <!-- Left Column: Input (Record or Upload) -->
+            <div class="col-md-6">
+                <div class="glass-card h-100">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-tabs custom-tabs" id="inputTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="record-tab" data-bs-toggle="tab" data-bs-target="#record-pane" type="button" role="tab" aria-controls="record-pane" aria-selected="true">
+                                <i class="bi bi-mic-fill me-2"></i>Record Voice
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-pane" type="button" role="tab" aria-controls="upload-pane" aria-selected="false">
+                                <i class="bi bi-cloud-upload-fill me-2"></i>Upload File
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Panes -->
+                    <div class="tab-content mt-3" id="inputTabsContent">
+                        <!-- Record Pane -->
+                        <div class="tab-pane fade show active" id="record-pane" role="tabpanel" aria-labelledby="record-tab" tabindex="0">
+                            <div class="recording-panel">
+                                <div class="record-btn-wrapper">
+                                    <div class="pulse-ring" id="pulseRing"></div>
+                                    <button class="btn-record" id="recordBtn" title="Click to Record">
+                                        <i class="bi bi-mic" id="recordIcon"></i>
+                                    </button>
+                                </div>
+                                
+                                <div id="recordStatus" class="fw-bold mb-3 text-white-50">Press the button to start recording</div>
+                                <div id="recordDuration" class="text-gradient fw-bold fs-4 mb-4 d-none">00:00</div>
+
+                                <div id="recordPlaybackContainer" class="d-none mt-2">
+                                    <h6 class="text-start mb-2"><i class="bi bi-headphones me-2"></i>Recorded Audio Playback:</h6>
+                                    <audio id="audioPlayback" controls class="mb-3"></audio>
+                                    <button class="btn btn-primary-custom w-100" id="transcribeRecordBtn">
+                                        <i class="bi bi-translate"></i> Transcribe Recording
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upload Pane -->
+                        <div class="tab-pane fade" id="upload-pane" role="tabpanel" aria-labelledby="upload-tab" tabindex="0">
+                            <div class="drop-zone" id="dropZone">
+                                <div class="drop-zone-icon">
+                                    <i class="bi bi-cloud-arrow-up-fill"></i>
+                                </div>
+                                <h5 class="fw-bold text-white mb-2">Drag & Drop Audio File Here</h5>
+                                <p class="text-white-50 small mb-3">Supports WAV, MP3, M4A, FLAC, WEBM (Max 25MB)</p>
+                                <span class="btn btn-register btn-sm">Browse Files</span>
+                                <input type="file" id="audioFileInput" accept="audio/*" class="d-none">
+                            </div>
+
+                            <div id="fileUploadDetails" class="d-none mt-4 p-3 bg-white bg-opacity-5 border border-white border-opacity-10 rounded-3">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-3 overflow-hidden">
+                                        <i class="bi bi-file-earmark-music-fill text-gradient fs-2 flex-shrink-0"></i>
+                                        <div class="overflow-hidden">
+                                            <div class="fw-bold text-truncate text-white" id="fileNameText">filename.wav</div>
+                                            <small class="text-white-50" id="fileSizeText">0.0 MB</small>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-link text-white-50 p-0 text-decoration-none" id="removeFileBtn">
+                                        <i class="bi bi-x-circle-fill fs-5"></i>
+                                    </button>
+                                </div>
+                                <audio id="filePlayback" controls class="mt-3 w-100"></audio>
+                                <button class="btn btn-primary-custom w-100 mt-3" id="transcribeUploadBtn">
+                                    <i class="bi bi-translate"></i> Transcribe Uploaded File
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Outputs -->
+            <div class="col-md-6">
+                <div class="glass-card h-100 d-flex flex-column">
+                    <h4 class="fw-bold mb-4 d-flex align-items-center justify-content-between">
+                        <span><i class="bi bi-body-text me-2 text-gradient"></i>Transcription Result</span>
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-20 d-none" id="statusBadge">Completed</span>
+                    </h4>
+
+                    <!-- Loader -->
+                    <div id="transcriptionLoader" class="d-none my-auto text-center py-5">
+                        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5 class="fw-bold text-white mb-2">Transcribing Audio...</h5>
+                        <p class="text-white-50 small px-4">Processing, please wait.</p>
+                    </div>
+
+                    <!-- Output Area -->
+                    <div id="resultContainer" class="d-flex flex-column flex-grow-1">
+                        <textarea class="form-control result-textarea flex-grow-1 mb-4" id="transcriptionOutput" readonly placeholder="Transcription will appear here..."></textarea>
+                        
+                        <div class="row g-2 mt-auto">
+                            <div class="col-6">
+                                <button class="btn btn-register w-100 py-2 d-flex align-items-center justify-content-center gap-2" id="copyTextBtn" disabled>
+                                    <i class="bi bi-clipboard"></i>
+                                    <span>Copy Text</span>
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <a class="btn btn-primary-custom w-100 py-2 d-flex align-items-center justify-content-center gap-2" id="downloadFileBtn" href="#" disabled>
+                                    <i class="bi bi-download"></i>
+                                    <span>Download TXT</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include the JS module -->
+<script src="{{ url_for('static', path='js/main.js') }}"></script>
+<script>
+    function togglePasswordVisibility(fieldId, iconId) {
+        const passwordField = document.getElementById(fieldId);
+        const toggleIcon = document.getElementById(iconId);
+        if (passwordField.type === "password") {
+            passwordField.type = "text";
+            toggleIcon.classList.remove("bi-eye-slash");
+            toggleIcon.classList.add("bi-eye");
+        } else {
+            passwordField.type = "password";
+            toggleIcon.classList.remove("bi-eye");
+            toggleIcon.classList.add("bi-eye-slash");
+        }
+    }
+</script>
+{% endblock %}
